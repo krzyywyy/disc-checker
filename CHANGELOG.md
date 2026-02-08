@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.4.3] - 2026-02-08
+
+### Changed
+- Reworked hidden execution path to launch CrystalDiskInfo via elevated Task Scheduler job.
+- Keeps UAC elevation prompt flow unchanged.
+- Reduces chance of visible `CDI - Detecting Disk` window during checks.
+- Updated package/version metadata and documentation references to 1.4.3.
+
 ## [1.4.2] - 2026-02-08
 
 ### Changed

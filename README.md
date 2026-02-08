@@ -6,8 +6,8 @@ The add-on runs in the background, requests elevation (UAC) for every check, and
 
 ## Status
 
-- Current version: `1.4.2`
-- Package: `dist/discChecker-1.4.2.nvda-addon`
+- Current version: `1.4.3`
+- Package: `dist/discChecker-1.4.3.nvda-addon`
 - Platform: Windows (NVDA add-on)
 - Diagnostic engine: bundled CrystalDiskInfo (`DiskInfo64.exe`)
 

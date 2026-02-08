@@ -309,29 +309,29 @@ def _run_elevated_command(executable: str, parameters: str, timeout: int = 120) 
         close_handle(info.hProcess)
 
 
-def _to_vbs_string_literal(text: str) -> str:
-    return '"' + text.replace('"', '""') + '"'
-
-
-def _run_elevated_hidden_command(executable: str, parameters: str, timeout: int = 120) -> int:
-    executable_path = pathlib.Path(executable)
-    argument_parts = [part for part in [parameters] if part]
-    command_line = subprocess.list2cmdline([executable_path.name] + argument_parts)
+def _run_elevated_background_task(executable: pathlib.Path, parameters: str, timeout: int = 120) -> int:
+    task_name = f"DiscChecker_CDI_{os.getpid()}_{int(time.time() * 1000)}"
+    task_command = subprocess.list2cmdline([str(executable)] + ([parameters] if parameters else []))
     script_path = ""
     try:
         with tempfile.NamedTemporaryFile(
             mode="w",
-            encoding="utf-16",
-            suffix=".vbs",
+            encoding="mbcs",
+            suffix=".cmd",
             delete=False,
         ) as temp_script:
-            temp_script.write('Set sh = CreateObject("WScript.Shell")\r\n')
-            temp_script.write(f"sh.CurrentDirectory = {_to_vbs_string_literal(str(executable_path.parent))}\r\n")
-            temp_script.write(f"WScript.Quit sh.Run({_to_vbs_string_literal(command_line)}, 0, True)\r\n")
+            temp_script.write("@echo off\r\n")
+            temp_script.write(
+                f'schtasks /Create /TN "{task_name}" /TR "{task_command}" /SC ONCE /ST 00:00 /RU SYSTEM /RL HIGHEST /F /Z >nul\r\n'
+            )
+            temp_script.write("if errorlevel 1 exit /b 11\r\n")
+            temp_script.write(f'schtasks /Run /TN "{task_name}" >nul\r\n')
+            temp_script.write("if errorlevel 1 exit /b 12\r\n")
+            temp_script.write("exit /b 0\r\n")
             script_path = temp_script.name
 
-        wscript_params = f'//B //NoLogo "{script_path}"'
-        return _run_elevated_command("wscript.exe", wscript_params, timeout=timeout)
+        params = f'/C "{script_path}"'
+        return _run_elevated_command("cmd.exe", params, timeout=timeout)
     finally:
         if script_path:
             try:
@@ -349,7 +349,7 @@ def _run_crystaldiskinfo_dump(executable: pathlib.Path, timeout: int = 180) -> s
         except OSError:
             previous_data = b""
 
-    exit_code = _run_elevated_hidden_command(str(executable), "/CopyExit", timeout=timeout)
+    exit_code = _run_elevated_background_task(executable, "/CopyExit", timeout=timeout)
     if exit_code != 0:
         log.warning("Disc Checker: CrystalDiskInfo exited with code %s", exit_code)
 
