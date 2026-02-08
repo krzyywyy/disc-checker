@@ -6,8 +6,8 @@ The add-on runs in the background, requests elevation (UAC) for every check, and
 
 ## Status
 
-- Current version: `1.4.1`
-- Package: `dist/discChecker-1.4.1.nvda-addon`
+- Current version: `1.4.2`
+- Package: `dist/discChecker-1.4.2.nvda-addon`
 - Platform: Windows (NVDA add-on)
 - Diagnostic engine: bundled CrystalDiskInfo (`DiskInfo64.exe`)
 
@@ -21,6 +21,7 @@ Coverage is limited, and behavior can vary between controllers, USB bridges, RAI
 - No separate external installation required for end users.
 - Bundled CrystalDiskInfo runtime inside the add-on package.
 - UAC elevation prompt on each run (by design, no fallback path).
+- CrystalDiskInfo check runs hidden in the background (no visible CrystalDiskInfo window).
 - Per-disk report with:
   - Health percentage
   - Temperature

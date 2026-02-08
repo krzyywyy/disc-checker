@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.4.2] - 2026-02-08
+
+### Changed
+- CrystalDiskInfo runtime check execution is now launched hidden in the background.
+- UAC prompt remains enabled and unchanged.
+- Updated package/version metadata and documentation references to 1.4.2.
+
 ## [1.4.1] - 2026-02-08
 
 ### Changed

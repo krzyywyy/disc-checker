@@ -1,7 +1,10 @@
 import ctypes
 from ctypes import wintypes
+import os
 import pathlib
 import re
+import subprocess
+import tempfile
 import threading
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -306,6 +309,37 @@ def _run_elevated_command(executable: str, parameters: str, timeout: int = 120) 
         close_handle(info.hProcess)
 
 
+def _to_vbs_string_literal(text: str) -> str:
+    return '"' + text.replace('"', '""') + '"'
+
+
+def _run_elevated_hidden_command(executable: str, parameters: str, timeout: int = 120) -> int:
+    executable_path = pathlib.Path(executable)
+    argument_parts = [part for part in [parameters] if part]
+    command_line = subprocess.list2cmdline([executable_path.name] + argument_parts)
+    script_path = ""
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-16",
+            suffix=".vbs",
+            delete=False,
+        ) as temp_script:
+            temp_script.write('Set sh = CreateObject("WScript.Shell")\r\n')
+            temp_script.write(f"sh.CurrentDirectory = {_to_vbs_string_literal(str(executable_path.parent))}\r\n")
+            temp_script.write(f"WScript.Quit sh.Run({_to_vbs_string_literal(command_line)}, 0, True)\r\n")
+            script_path = temp_script.name
+
+        wscript_params = f'//B //NoLogo "{script_path}"'
+        return _run_elevated_command("wscript.exe", wscript_params, timeout=timeout)
+    finally:
+        if script_path:
+            try:
+                os.unlink(script_path)
+            except OSError:
+                pass
+
+
 def _run_crystaldiskinfo_dump(executable: pathlib.Path, timeout: int = 180) -> str:
     output_path = executable.parent / "DiskInfo.txt"
     previous_data = b""
@@ -315,7 +349,7 @@ def _run_crystaldiskinfo_dump(executable: pathlib.Path, timeout: int = 180) -> s
         except OSError:
             previous_data = b""
 
-    exit_code = _run_elevated_command(str(executable), "/CopyExit", timeout=timeout)
+    exit_code = _run_elevated_hidden_command(str(executable), "/CopyExit", timeout=timeout)
     if exit_code != 0:
         log.warning("Disc Checker: CrystalDiskInfo exited with code %s", exit_code)
 
