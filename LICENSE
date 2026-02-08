@@ -1,21 +1,33 @@
-MIT License
+Disc Checker Non-Commercial License 1.0
 
 Copyright (c) 2026 krzywy
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+1. Permission Grant
+You are allowed to use, copy, modify, and redistribute this software and
+derivative works for non-commercial purposes only.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+2. Non-Commercial Restriction
+You may not sell this software, sell derivative works, or use this software
+or derivative works in any paid product, paid service, or other commercial
+activity intended for monetary compensation.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+3. Distribution Conditions
+If you redistribute this software (original or modified), you must:
+- keep this license text in the distribution,
+- clearly mark your changes,
+- include original copyright notice.
+
+4. No Warranty
+This software is provided "as is", without warranty of any kind, express or
+implied, including but not limited to merchantability, fitness for a
+particular purpose, and noninfringement.
+
+5. Limitation of Liability
+In no event shall the authors or copyright holders be liable for any claim,
+damages, or other liability, whether in an action of contract, tort, or
+otherwise, arising from or in connection with the software or the use of the
+software.
+
+6. Third-Party Components
+This repository and distributed package may include third-party components that
+are licensed separately. Their original licenses remain in effect.

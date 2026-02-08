@@ -6,8 +6,8 @@ The add-on runs in the background, requests elevation (UAC) for every check, and
 
 ## Status
 
-- Current version: `1.4.0`
-- Package: `dist/discChecker-1.4.0.nvda-addon`
+- Current version: `1.4.1`
+- Package: `dist/discChecker-1.4.1.nvda-addon`
 - Platform: Windows (NVDA add-on)
 - Diagnostic engine: bundled CrystalDiskInfo (`DiskInfo64.exe`)
 
@@ -87,5 +87,7 @@ The generated package is written to `dist/`.
 
 ## License
 
-- Project code: MIT (see `LICENSE`).
+- Project code: Disc Checker Non-Commercial License 1.0 (see `LICENSE`).
+- Modifications are allowed.
+- Commercial use and selling are not allowed.
 - Bundled third-party components remain under their respective licenses.

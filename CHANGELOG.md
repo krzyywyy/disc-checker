@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.4.1] - 2026-02-08
+
+### Changed
+- Replaced MIT license with a non-commercial project license.
+- Explicitly allows modification and redistribution for non-commercial use.
+- Explicitly disallows selling and other commercial use.
+- Updated package/version metadata and documentation references to 1.4.1.
+
 ## [1.4.0] - 2026-02-08
 
 ### Added
