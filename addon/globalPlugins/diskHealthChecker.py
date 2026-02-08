@@ -40,6 +40,8 @@ _SW_HIDE = 0
 _WAIT_OBJECT_0 = 0x00000000
 _WAIT_TIMEOUT = 0x00000102
 _ERROR_CANCELLED = 1223
+_CF_TEXT = 1
+_CF_UNICODETEXT = 13
 
 _SIZE_MULTIPLIERS = {
     "B": 1,
@@ -321,8 +323,9 @@ def _run_elevated_background_task(executable: pathlib.Path, parameters: str, tim
             delete=False,
         ) as temp_script:
             temp_script.write("@echo off\r\n")
+            temp_script.write(f'set "DISC_CHECKER_TASK_COMMAND={task_command}"\r\n')
             temp_script.write(
-                f'schtasks /Create /TN "{task_name}" /TR "{task_command}" /SC ONCE /ST 00:00 /RU SYSTEM /RL HIGHEST /F /Z >nul\r\n'
+                f'schtasks /Create /TN "{task_name}" /TR "%DISC_CHECKER_TASK_COMMAND%" /SC ONCE /ST 00:00 /RU SYSTEM /RL HIGHEST /F /Z >nul\r\n'
             )
             temp_script.write("if errorlevel 1 exit /b 11\r\n")
             temp_script.write(f'schtasks /Run /TN "{task_name}" >nul\r\n')
@@ -340,6 +343,168 @@ def _run_elevated_background_task(executable: pathlib.Path, parameters: str, tim
                 pass
 
 
+def _to_vbs_string_literal(text: str) -> str:
+    return '"' + text.replace('"', '""') + '"'
+
+
+def _run_elevated_hidden_vbs_command(executable: pathlib.Path, parameters: str, timeout: int = 120) -> int:
+    command_line = subprocess.list2cmdline([executable.name] + ([parameters] if parameters else []))
+    script_path = ""
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-16",
+            suffix=".vbs",
+            delete=False,
+        ) as temp_script:
+            temp_script.write('Set sh = CreateObject("WScript.Shell")\r\n')
+            temp_script.write(f"sh.CurrentDirectory = {_to_vbs_string_literal(str(executable.parent))}\r\n")
+            temp_script.write(f"WScript.Quit sh.Run({_to_vbs_string_literal(command_line)}, 0, True)\r\n")
+            script_path = temp_script.name
+
+        vbs_params = f'//B //NoLogo "{script_path}"'
+        return _run_elevated_command("wscript.exe", vbs_params, timeout=timeout)
+    finally:
+        if script_path:
+            try:
+                os.unlink(script_path)
+            except OSError:
+                pass
+
+
+def _looks_like_crystaldiskinfo_report(text: str) -> bool:
+    raw = str(text or "").strip()
+    if not raw:
+        return False
+    if "CrystalDiskInfo" not in raw:
+        return False
+    for line in raw.splitlines():
+        if _DISK_HEADER_RE.match(line):
+            return True
+    return False
+
+
+def _read_clipboard_text() -> Optional[str]:
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+
+    open_clipboard = user32.OpenClipboard
+    open_clipboard.argtypes = [wintypes.HWND]
+    open_clipboard.restype = wintypes.BOOL
+
+    close_clipboard = user32.CloseClipboard
+    close_clipboard.argtypes = []
+    close_clipboard.restype = wintypes.BOOL
+
+    is_clipboard_format_available = user32.IsClipboardFormatAvailable
+    is_clipboard_format_available.argtypes = [wintypes.UINT]
+    is_clipboard_format_available.restype = wintypes.BOOL
+
+    get_clipboard_data = user32.GetClipboardData
+    get_clipboard_data.argtypes = [wintypes.UINT]
+    get_clipboard_data.restype = wintypes.HANDLE
+
+    global_lock = kernel32.GlobalLock
+    global_lock.argtypes = [wintypes.HANDLE]
+    global_lock.restype = wintypes.LPVOID
+
+    global_unlock = kernel32.GlobalUnlock
+    global_unlock.argtypes = [wintypes.HANDLE]
+    global_unlock.restype = wintypes.BOOL
+
+    for _ in range(20):
+        if open_clipboard(None):
+            break
+        time.sleep(0.05)
+    else:
+        return None
+
+    try:
+        if is_clipboard_format_available(_CF_UNICODETEXT):
+            handle = get_clipboard_data(_CF_UNICODETEXT)
+            if not handle:
+                return None
+            pointer = global_lock(handle)
+            if not pointer:
+                return None
+            try:
+                text = ctypes.wstring_at(pointer)
+            finally:
+                global_unlock(handle)
+            text = str(text).strip()
+            return text or None
+
+        if is_clipboard_format_available(_CF_TEXT):
+            handle = get_clipboard_data(_CF_TEXT)
+            if not handle:
+                return None
+            pointer = global_lock(handle)
+            if not pointer:
+                return None
+            try:
+                text = ctypes.string_at(pointer).decode("mbcs", errors="replace")
+            finally:
+                global_unlock(handle)
+            text = str(text).strip()
+            return text or None
+    finally:
+        close_clipboard()
+
+    return None
+
+
+def _read_clipboard_text_if_ready(previous_text: str) -> Optional[str]:
+    current_text = _read_clipboard_text()
+    if not current_text:
+        return None
+    if previous_text and current_text == previous_text:
+        return None
+    if _looks_like_crystaldiskinfo_report(current_text):
+        return current_text
+    return None
+
+
+def _read_diskinfo_text_if_ready(output_path: pathlib.Path, previous_data: bytes) -> Optional[str]:
+    try:
+        current_data = output_path.read_bytes()
+    except OSError:
+        return None
+    if not current_data:
+        return None
+    decoded_text = _decode_text_bytes(current_data)
+    if not _looks_like_crystaldiskinfo_report(decoded_text):
+        return None
+    if not previous_data or current_data != previous_data:
+        return decoded_text
+    return None
+
+
+def _read_crystaldiskinfo_output_if_ready(
+    output_path: pathlib.Path,
+    previous_data: bytes,
+    previous_clipboard_text: str,
+) -> Optional[str]:
+    diskinfo_text = _read_diskinfo_text_if_ready(output_path, previous_data)
+    if diskinfo_text is not None:
+        return diskinfo_text
+    return _read_clipboard_text_if_ready(previous_clipboard_text)
+
+
+def _wait_for_crystaldiskinfo_output(
+    output_path: pathlib.Path,
+    previous_data: bytes,
+    previous_clipboard_text: str,
+    seconds: float,
+) -> Optional[str]:
+    deadline = time.monotonic() + max(1.0, float(seconds))
+    while time.monotonic() < deadline:
+        text = _read_crystaldiskinfo_output_if_ready(output_path, previous_data, previous_clipboard_text)
+        if text is not None:
+            return text
+        time.sleep(0.25)
+    return _read_crystaldiskinfo_output_if_ready(output_path, previous_data, previous_clipboard_text)
+
+
 def _run_crystaldiskinfo_dump(executable: pathlib.Path, timeout: int = 180) -> str:
     output_path = executable.parent / "DiskInfo.txt"
     previous_data = b""
@@ -348,31 +513,50 @@ def _run_crystaldiskinfo_dump(executable: pathlib.Path, timeout: int = 180) -> s
             previous_data = output_path.read_bytes()
         except OSError:
             previous_data = b""
-
-    exit_code = _run_elevated_background_task(executable, "/CopyExit", timeout=timeout)
-    if exit_code != 0:
-        log.warning("Disc Checker: CrystalDiskInfo exited with code %s", exit_code)
-
-    deadline = time.monotonic() + 25.0
-    while time.monotonic() < deadline:
         try:
-            current_data = output_path.read_bytes()
+            output_path.unlink()
+            previous_data = b""
         except OSError:
-            current_data = b""
-        if current_data:
-            if not previous_data or current_data != previous_data:
-                return _decode_text_bytes(current_data)
-        time.sleep(0.25)
+            pass
 
-    if output_path.is_file():
+    previous_clipboard_text = _read_clipboard_text() or ""
+
+    launch_issues: List[str] = []
+    launch_methods = [
+        ("vbs-hidden", lambda: _run_elevated_hidden_vbs_command(executable, "/CopyExit", timeout=timeout)),
+        ("scheduled-task-hidden", lambda: _run_elevated_background_task(executable, "/CopyExit", timeout=timeout)),
+        ("direct-elevated", lambda: _run_elevated_command(str(executable), "/CopyExit", timeout=timeout)),
+    ]
+
+    for method_name, method_runner in launch_methods:
         try:
-            current_data = output_path.read_bytes()
-        except OSError:
-            current_data = b""
-        if current_data:
-            return _decode_text_bytes(current_data)
+            exit_code = method_runner()
+        except PermissionError:
+            raise
+        except Exception as exc:
+            launch_issues.append(f"{method_name}: launch failed ({exc})")
+            continue
 
-    raise RuntimeError("CrystalDiskInfo did not produce DiskInfo.txt.")
+        if exit_code != 0:
+            launch_issues.append(f"{method_name}: exit code {exit_code}")
+
+        wait_time = 10.0 if method_name != "direct-elevated" else 25.0
+        output_text = _wait_for_crystaldiskinfo_output(
+            output_path=output_path,
+            previous_data=previous_data,
+            previous_clipboard_text=previous_clipboard_text,
+            seconds=wait_time,
+        )
+        if output_text is not None:
+            return output_text
+
+        launch_issues.append(f"{method_name}: no CrystalDiskInfo output")
+        previous_clipboard_text = _read_clipboard_text() or previous_clipboard_text
+
+    if launch_issues:
+        log.warning("Disc Checker launch issues: %s", " | ".join(launch_issues[:6]))
+
+    raise RuntimeError("CrystalDiskInfo did not produce readable output.")
 
 
 def _parse_section_properties(lines: List[str]) -> Tuple[Dict[str, str], List[Tuple[str, str]]]:

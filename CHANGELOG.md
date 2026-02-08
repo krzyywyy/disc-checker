@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.4.4] - 2026-02-08
+
+### Fixed
+- Fixed a regression where some checks could end with no visible result.
+- Added robust CrystalDiskInfo result capture from both `DiskInfo.txt` and `/CopyExit` clipboard output.
+- Removed stale runtime output reuse by deleting previous `DiskInfo.txt` before each run.
+- Added package build filters to exclude local CrystalDiskInfo runtime artifacts (`DiskInfo.txt`, generated `Smart` subfolders).
+
 ## [1.4.3] - 2026-02-08
 
 ### Changed

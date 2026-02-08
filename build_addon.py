@@ -5,6 +5,22 @@ import pathlib
 import zipfile
 
 
+def _should_include_file(addon_dir: pathlib.Path, file_path: pathlib.Path) -> bool:
+	rel_path = file_path.relative_to(addon_dir).as_posix()
+	lower_rel_path = rel_path.lower()
+
+	if file_path.suffix.lower() in {".pyc", ".pyo"}:
+		return False
+
+	# Runtime artifacts produced by CrystalDiskInfo should never be bundled.
+	if lower_rel_path == "bin/crystaldiskinfo/diskinfo.txt":
+		return False
+	if lower_rel_path.startswith("bin/crystaldiskinfo/smart/") and lower_rel_path != "bin/crystaldiskinfo/smart/readme.txt":
+		return False
+
+	return True
+
+
 def _read_manifest_value(manifest_text: str, key: str) -> str:
 	prefix = f"{key} ="
 	for raw_line in manifest_text.splitlines():
@@ -32,7 +48,7 @@ def build(addon_dir: pathlib.Path, output_dir: pathlib.Path) -> pathlib.Path:
 		for file_path in sorted(addon_dir.rglob("*")):
 			if not file_path.is_file():
 				continue
-			if file_path.suffix.lower() in {".pyc", ".pyo"}:
+			if not _should_include_file(addon_dir, file_path):
 				continue
 			rel_path = file_path.relative_to(addon_dir).as_posix()
 			archive.write(file_path, rel_path)
